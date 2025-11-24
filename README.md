@@ -71,7 +71,7 @@ pip install numpy nltk scipy
   bashpython synth.py -p "hello" --crossfade
   Combined:
   bashpython synth.py --fromfile input.txt -o output.wav --volume 80 --crossfade
-  ```
+
 
 ## Project Structure
 ```
@@ -83,7 +83,7 @@ CPSLPSummative1/
 ├── diphones/             # Pre-recorded diphone audio files
 ├── examples/             # Reference output examples
 └── README.md
-
+```
 Implementation Details
 Core Architecture
 Synth Class
