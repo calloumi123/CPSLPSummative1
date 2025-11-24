@@ -100,7 +100,7 @@ Converts word sequences to phoneme sequences using CMU dictionary
 Supports custom pronunciation loading from external files
 Manages reversal operations at word or phoneme level
 
-Main Processing Pipeline
+#### Main Processing Pipeline
 
 Normalise input text to extract words
 Look up words in CMU dictionary (or custom pronunciations if provided)
@@ -110,7 +110,7 @@ Load and concatenate corresponding audio files
 Apply effects (volume, reversal, cross-fading)
 Save to file or play audio
 
-Key Implementation Decisions
+#### Key Implementation Decisions
 Type Hints: Full type annotations throughout for clarity and maintainability, appropriate for data science workflows.
 Error Handling: Words not found in the dictionary are logged as warnings rather than causing crashes, allowing partial synthesis of mixed-vocabulary input.
 Custom Pronunciations: Regular expression parsing of pronunciation file format allows users to extend the dictionary with domain-specific or non-English words.
@@ -127,5 +127,5 @@ Crossfade window: 10ms Hann window
 Inter-sentence silence: 400ms
 Stress markers automatically stripped from CMU phonemes for diphone matching
 
-License
-This project was completed as part of a university coursework assignment at the School of Informatics, University of Edinburgh.RetryTo run code, enable code execution and file creation in Settings > Capabilities.Claude can make mistakes. Please double-check responses.
+##### License
+This project was completed as part of a university coursework assignment at the School of Informatics, University of Edinburgh.
