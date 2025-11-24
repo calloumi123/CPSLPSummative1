@@ -75,14 +75,15 @@ pip install numpy nltk scipy
 
 ## Project Structure
 ```
+README.md
 CPSLPSummative1/
 ├── synth.py              # Main synthesiser implementation
 ├── synth_args.py         # Command-line argument parsing (provided)
 ├── simpleaudio.py        # Audio file handling utilities (provided)
 ├── test_synth.py         # Unit tests
 ├── diphones/             # Pre-recorded diphone audio files
-├── examples/             # Reference output examples
-└── README.md
+└── examples/             # Reference output examples
+
 ```
 Implementation Details
 Core Architecture
