@@ -1,0 +1,3 @@
+scunner:1:NN:1a:{ S K AH1 N ER0 }::
+numpty:1:NN:1a:{ N AH1 M P T IY0 }::
+drookit:1:JJ:1a:{ D R UW1 K IH0 T }::
