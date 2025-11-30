@@ -1,10 +1,9 @@
-"""A simple diphone synthesiser programme. With extensions A,B,D,E"""
+"""A simple diphone synthesiser programme. With extensions A,B,C,D,E"""
 
 import re
 import wave
 from pathlib import Path
 from typing import List, Dict
-from scipy.io import wavfile
 
 from nltk.corpus import cmudict
 import numpy as np
@@ -12,11 +11,9 @@ import simpleaudio
 
 from synth_args import process_commandline
 
-
 def strip_stress_markers(phone: str) -> str:
     """Remove stress markers (0-9) from the end of a phone."""
     return phone.rstrip("0123456789")
-
 
 # import numpy
 # ...others?  (only modules that come as standard with Python3, so
@@ -31,23 +28,33 @@ class Synth:
     """A simple diphone synthesiser class."""
 
     def __init__(self, wav_folder: str) -> None:
-        self.diphones: Dict[str, np.ndarray] = self.get_wavs(wav_folder)
-        self.sample_rate: int = 48000
+        self.diphones, self.sample_rate = self.get_wavs(wav_folder)
 
     def get_wavs(self, wav_folder):
         """Loads all the waveform data contained in WAV_FOLDER.
         Returns a dictionary, with unit names as keys and the corresponding
         loaded audio data as values."""
-
+    
         diphones: Dict[str, np.ndarray] = {}
-        wav_path = Path(wav_folder)
-
-        for wav_file in wav_path.glob("*.wav"):
-            with wave.open(str(wav_file), "rb") as wf:
-                audio_bytes: bytes = wf.readframes(wf.getnframes())
-                audio_data: np.ndarray = np.frombuffer(audio_bytes, dtype=np.int16)
-                diphones[wav_file.stem] = audio_data
-        return diphones
+        wav_files: list[Path] = list(Path(wav_folder).glob("*.wav"))
+        
+        if not wav_files:
+            raise ValueError(f"No wav files found in '{wav_folder}'")
+        
+        first_audio = simpleaudio.Audio()
+        first_audio.load(str(wav_files[0]))
+        sample_rate: int = first_audio.rate
+        diphones[wav_files[0].stem] = first_audio.data
+        
+        for wav_file in wav_files[1:]:
+            audio_data = simpleaudio.Audio()
+            audio_data.load(str(wav_file))
+            
+            if audio_data.rate != sample_rate:
+                raise ValueError(f"Sample rate mismatch in '{wav_file.name}'")
+            diphones[wav_file.stem] = audio_data.data
+            
+        return diphones, sample_rate
 
     def crossfade(self, list_of_diphone_waves: List[np.ndarray]) -> np.ndarray:
         """
@@ -65,15 +72,12 @@ class Synth:
 
         for i, a_wave in enumerate(list_of_diphone_waves[:-1]):  # All except last
             next_wave = list_of_diphone_waves[i + 1]
-
-            # Get end of current and start of next
             end_wave = a_wave[-overlap_size:]
             start_next_wave = next_wave[:overlap_size]
 
             # Apply Hann and average
             faded_end = end_wave * fade_out
             faded_start = start_next_wave * fade_in
-
             overlapped = (faded_end + faded_start) / 2
 
             # Update both diphones
@@ -82,8 +86,7 @@ class Synth:
             )
             list_of_diphone_waves[i + 1] = next_wave[
                 overlap_size:
-            ]  # no overlapped added cause crossfading makes signal/sentences shorter
-
+            ]  
         # Concatenate all
         combined = np.concatenate(list_of_diphone_waves)
         return combined
@@ -98,9 +101,7 @@ class Synth:
         :param smooth_concat: use crossfading
         :return: synthesised utterance (Audio instance)
         """
-
         diphones_seq: List[str] = self.phones_to_diphones(phones)
-
         combined: np.ndarray = np.array([], dtype=np.int16)
 
         if crossfade:
@@ -111,16 +112,18 @@ class Synth:
             print(smooth_list)
             combined = self.crossfade(smooth_list)
         else:
+            diphones_to_be_said: List[np.ndarray] = []
             for diphone in diphones_seq:
                 if diphone.lower() in self.diphones:
-                    combined = np.concatenate(
-                        (combined, self.diphones[diphone.lower()])
+                    diphones_to_be_said.append(self.diphones[diphone.lower()])
+            combined = np.concatenate(
+                        (diphones_to_be_said)
                     )
 
         if reverse == "signal":
             combined = combined[::-1]
 
-        audio: simpleaudio.Audio = simpleaudio.Audio(channels=1, rate=self.sample_rate)
+        audio: simpleaudio.Audio = simpleaudio.Audio()
         audio.data = combined
         return audio
 
@@ -130,12 +133,10 @@ class Synth:
         :param phones: list of phones (list of strings)
         :return: list of diphones (list of strings)
         """
-
         diphones_seq: List[str] = []
         for i in range(len(phones) - 1):
             diphones_seq.append(f"{phones[i]}-{phones[i+1]}")
         return diphones_seq
-
 
 class Utterance:
     """Class to represent and process an utterance."""
@@ -145,7 +146,7 @@ class Utterance:
         Constructor takes a phrase to process.
         :param phrase: a string which contains the phrase to process.
         """
-        print(f"Processing phrase: {phrase}")  # just a hint - can be deleted
+        print(f"Processing phrase: {phrase}")  
         self.phrase: str = phrase
 
     def normalize_text(self, text: str) -> List[str]:
@@ -155,7 +156,6 @@ class Utterance:
 
         for sym in puncts:
             text = text.replace(sym, " ")
-
         textlist: List[str] = text.split()
         return textlist
 
@@ -166,9 +166,7 @@ class Utterance:
         custom_prons: Dict[str, List[List[str]]] = {}
         try:
             with open(pron_file, "r", encoding="utf-8") as f:
-                content: str = f.read()
-
-            # Fix: capture word at start, then skip fields until {phones}
+                content: str = f.read() 
             pattern: re.Pattern = re.compile(r"^(\w+):.*?\{([^}]+)\}", re.MULTILINE)
             matches: List[tuple] = pattern.findall(content)
 
@@ -182,7 +180,6 @@ class Utterance:
                     strip_stress_markers(p.strip()) for p in phones_str.split()
                 ]
                 custom_prons[word_lower] = [phones]
-                print(f"DEBUG: '{word_lower}' -> {phones}")
 
             if custom_prons:
                 print(
@@ -205,12 +202,11 @@ class Utterance:
         if isinstance(addpron, (str, Path)):
             addpron_dict = self.load_pronunciations(str(addpron))
 
-        phones: List[str] = ["PAU"]  # Start with silence
+        phones: List[str] = ["PAU"]  
 
         for word in words:
             if word in addpron_dict:
-                # Already cleaned in load_pronunciations, no stripping needed
-                word_phones: List[str] = addpron_dict[word][0]
+                word_phones: List[str] = addpron_dict[word][0] # Already cleaned in load_pronunciations, no stripping needed
                 phones.extend(word_phones)
             elif word in cmu_dict:
                 # Strip stress markers from CMU dict
@@ -243,105 +239,80 @@ class Utterance:
             reverse = None
 
         phones_seq: List[str] = self.text_to_phones(words, addpron)
-
         if reverse == "phones":
             phones_seq = phones_seq[::-1]
 
         return phones_seq
 
+def run_synthesis(phone_seq: List[str], args, wav_folder: str) -> simpleaudio.Audio:
+    diphone_synth: Synth = Synth(wav_folder=wav_folder)
+    audio: simpleaudio.Audio = diphone_synth.synthesise(phone_seq, reverse=args.reverse, crossfade=args.crossfade)
+    if args.volume is not None:
+        if not 0 <= args.volume <= 100:
+            raise ValueError("Volume must be between 0 and 100")
+        audio.rescale(args.volume / 100.0)
+    return audio
 
-def process_file(textfile: str, args):
+def save_and_play(audio: simpleaudio.Audio, args) -> None:
+    if args.outfile:
+        audio.save(args.outfile)
+    if args.play:
+        audio.play()
+
+def apply_volume(audio: simpleaudio.Audio, volume: int | None) -> None:
+    """Apply volume scaling to audio if specified."""
+    if volume is not None:
+        if not 0 <= volume <= 100:
+            raise ValueError("Volume must be between 0 and 100")
+        audio.rescale(volume / 100.0)
+
+def process_file(textfile: str, args) -> None:
     """
     Takes the path to a text file and synthesises each sentence it contains
     :param textfile: the path to a text file (string)
-    :param args:  the parsed command line argument object giving options
-    :return: a list of Audio objects - one for each sentence in order.
+    :param args: the parsed command line argument object giving options
+    :return: None
     """
-    list_of_audios: List[simpleaudio.Audio] = []
-
-    def read_entire_file(file_path: str) -> str:
-        """Reads the entire content of a text file."""
-        with open(file_path, "r", encoding="utf-8") as file:
-            content: str = file.read()
-        return content
-
-    def split_into_sentences(text: str) -> List[str]:
-        """Splits text into sentences based on punctuation."""
-        sentence_endings: re.Pattern = re.compile(r"(?<=[.!?]) +")
-        sentences: List[str] = sentence_endings.split(text.strip())
-        return sentences
-
-    text_content: str = read_entire_file(textfile)
-    sentences: List[str] = split_into_sentences(text_content)
+    synth: Synth = Synth(wav_folder=args.diphones)
+    
+    with open(textfile, "r", encoding="utf-8") as f:
+        sentences: List[str] = re.split(r"(?<=[.!?])\s+", f.read().strip())
+    
+    silence: np.ndarray = np.zeros(int(synth.sample_rate * 0.4), dtype=np.int16)
+    chunks: List[np.ndarray] = []
+    
     for phrase in sentences:
-        utt = Utterance(phrase)
-        phones = utt.get_phone_seq(reverse=args.reverse, addpron=args.addpron)
-        diphone_synth = Synth(wav_folder=args.diphones)
-        audio = diphone_synth.synthesise(
-            phones, reverse=args.reverse, crossfade=args.crossfade
-        )
-        list_of_audios.append(audio)
+        phone_seq: List[str] = Utterance(phrase).get_phone_seq(reverse=args.reverse, addpron=args.addpron)
+        audio: simpleaudio.Audio = synth.synthesise(phone_seq, reverse=args.reverse, crossfade=args.crossfade)
+        apply_volume(audio, args.volume)
+        
+        if chunks:
+            chunks.append(silence)
+        chunks.append(audio.data)
+    
+    combined: simpleaudio.Audio = simpleaudio.Audio(rate=synth.sample_rate)
+    combined.data = np.concatenate(chunks)
+    save_and_play(combined, args)
 
-    if list_of_audios and args.outfile:
-        diphone_synth: Synth = Synth(wav_folder=args.diphones)
-        sample_rate: int = diphone_synth.sample_rate
+def main(args) -> None:
+    """Main function."""
+    print(args)
+    if args.fromfile:
+        process_file(args.fromfile, args)
+    else:
+        phone_seq: List[str] = Utterance(args.phrase).get_phone_seq(reverse=args.reverse, addpron=args.addpron)
+        audio: simpleaudio.Audio = run_synthesis(phone_seq, args, args.diphones)
+        apply_volume(audio, args.volume)
+        save_and_play(audio, args)
 
-        silence_duration: float = 0.4
-        silence_samples: int = int(sample_rate * silence_duration)
-        silence_data: np.ndarray = np.zeros(silence_samples, dtype=np.int16)
-
-        # Create silence Audio object
-        silence_audio: simpleaudio.Audio = simpleaudio.Audio(rate=sample_rate)
-        silence_audio.data = silence_data
-
-        combined_audio: simpleaudio.Audio = list_of_audios[0]
-        for audio in list_of_audios[1:]:
-            combined_audio = combined_audio.concatenate(silence_audio)
-            combined_audio = combined_audio.concatenate(audio)
-
-        combined_audio.save(args.outfile)
-        out_path = args.outfile
-    return list_of_audios,out_path
+if __name__ == "__main__":
+    main(process_commandline())
     # Store or process audio as needed
 
 # Make this the top-level "driver" function for your programme.  There are some hints here
 # to get you going, but you will need to add all the code to make your programme behave
 # correctly according to the commandline options given in args (and assignment description!).
-def main(args):
-    "main function"
-    print(
-        args
-    )  # just to demonstrate what the user has asked for - delete this when ready
 
-    if args.fromfile:
-        audios = process_file(args.fromfile, args)
-        # Further processing of audios if needed
-        return
-
-    utt = Utterance(phrase=args.phrase)
-    phone_seq = utt.get_phone_seq(reverse=args.reverse, addpron=args.addpron)
-    print(args.addpron)
-    print("testing --------------------------------------------")
-
-    print(phone_seq)
-
-    print(f"Will load wavs from: {args.diphones}")  # just a clue - can be deleted
-    diphone_synth = Synth(wav_folder=args.diphones)
-
-    out = diphone_synth.synthesise(
-        phone_seq, reverse=args.reverse, crossfade=args.crossfade
-    )
-
-    if args.volume is not None:
-        volume_factor: float = args.volume / 100.0
-        out.data = (out.data * volume_factor).astype(np.int16)
-
-    if args.outfile:
-        wavfile.write(args.outfile, out.rate, out.data.astype(np.int16))
-
-    # Play if requested
-    if args.play:
-        out.play()
     # do what you like with "out"...
 
 # DO NOT change or add anything below here

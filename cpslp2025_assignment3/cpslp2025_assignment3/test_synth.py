@@ -20,10 +20,9 @@ from numpy import array_equal, flip
 import simpleaudio
 import synth as student_code  # student's own implementation that we are testing in this module
 
-
 def default_args():
     return Namespace(diphones='./diphones', play=False, outfile='testout.wav', phrase='shimmer',
-                     volume=None, spell=False, reverse=None, addpron=None, fromfile=None, crossfade=False)
+        volume=None, spell=False, reverse=None, addpron=None, fromfile=None, crossfade=False)
 
 def synthesise_to_wav(args):
 
@@ -35,7 +34,6 @@ def synthesise_to_wav(args):
         a.load(str(outpath))
 
     return a
-
 
 class TestSynth(unittest.TestCase):
 
